@@ -74,7 +74,9 @@ class AppController:
             "delay_before": 0.1,
             "delay_after": 0.1,
             "key": "a",
-            "duration": 1.0
+            "duration": 1.0,
+            "text": "Hello World!",
+            "press_enter": False
         }
         self.points.append(new_point)
         self.refresh_ui()

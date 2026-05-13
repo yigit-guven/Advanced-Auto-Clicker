@@ -1,7 +1,7 @@
 
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QScrollArea, QFrame, 
-                             QComboBox, QDoubleSpinBox, QLineEdit)
+                             QComboBox, QDoubleSpinBox, QLineEdit, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from styles import MAIN_STYLE
 
@@ -48,10 +48,10 @@ class PointConfigCard(QFrame):
         v_action = QVBoxLayout()
         v_action.addWidget(QLabel("Type"))
         self.action_combo = QComboBox()
-        self.action_combo.addItems(["Left Click", "Right Click", "Double Click", "Hold Left", "Hold Right", "Key Press", "Hold Key"])
+        self.action_combo.addItems(["Left Click", "Right Click", "Double Click", "Hold Left", "Hold Right", "Key Press", "Hold Key", "Type Text"])
         action_map = {
             "left_click": 0, "right_click": 1, "double_click": 2, 
-            "hold_left": 3, "hold_right": 4, "key_press": 5, "hold_key": 6
+            "hold_left": 3, "hold_right": 4, "key_press": 5, "hold_key": 6, "type_text": 7
         }
         self.action_combo.setCurrentIndex(action_map.get(data.get('action', 'left_click'), 0))
         self.action_combo.currentIndexChanged.connect(self._on_change)
@@ -86,6 +86,16 @@ class PointConfigCard(QFrame):
         self.dur_spin.setValue(data.get('duration', 1.0))
         self.dur_spin.valueChanged.connect(self._on_change)
         self.v_extra.addWidget(self.dur_spin)
+
+        self.text_input = QLineEdit(data.get('text', 'Hello World!'))
+        self.text_input.setPlaceholderText("Enter sentence...")
+        self.text_input.textChanged.connect(self._on_change)
+        self.v_extra.addWidget(self.text_input)
+
+        self.enter_check = QCheckBox("Press Enter")
+        self.enter_check.setChecked(data.get('press_enter', False))
+        self.enter_check.stateChanged.connect(self._on_change)
+        self.v_extra.addWidget(self.enter_check)
         
         settings_layout.addLayout(self.v_extra, 1)
         
@@ -96,22 +106,29 @@ class PointConfigCard(QFrame):
         action = self.action_combo.currentText()
         is_key = "Key" in action
         is_hold = "Hold" in action
+        is_type = "Type Text" in action
         
         self.key_input.setVisible(is_key)
         self.dur_spin.setVisible(is_hold)
-        self.extra_label.setVisible(is_key or is_hold)
+        self.text_input.setVisible(is_type)
+        self.enter_check.setVisible(is_type)
+        
+        self.extra_label.setVisible(is_key or is_hold or is_type)
         if is_key: self.extra_label.setText("Key")
         elif is_hold: self.extra_label.setText("Duration")
+        elif is_type: self.extra_label.setText("Text")
 
     def _on_change(self):
         self._update_visibility()
-        action_keys = ["left_click", "right_click", "double_click", "hold_left", "hold_right", "key_press", "hold_key"]
+        action_keys = ["left_click", "right_click", "double_click", "hold_left", "hold_right", "key_press", "hold_key", "type_text"]
         new_data = {
             **self.data,
             "action": action_keys[self.action_combo.currentIndex()],
             "delay_before": self.delay_spin.value(),
             "key": self.key_input.text(),
-            "duration": self.dur_spin.value()
+            "duration": self.dur_spin.value(),
+            "text": self.text_input.text(),
+            "press_enter": self.enter_check.isChecked()
         }
         self.updated.emit(self.index, new_data)
 
@@ -124,7 +141,7 @@ class DashboardWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Advanced Auto Clicker")
+        self.setWindowTitle("Advanced Auto Clicker v1.0.1")
         self.setMinimumSize(550, 700)
         self.setStyleSheet(MAIN_STYLE)
         
@@ -138,7 +155,7 @@ class DashboardWindow(QMainWindow):
         
         # Header Section
         header_layout = QVBoxLayout()
-        title = QLabel("ADVANCED AUTO CLICKER")
+        title = QLabel("ADVANCED AUTO CLICKER v1.0.1")
         title.setObjectName("Title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)

@@ -68,6 +68,12 @@ class ClickEngine:
                         pyautogui.keyDown(key)
                         time.sleep(duration)
                         pyautogui.keyUp(key)
+                    elif action == 'type_text':
+                        text = point.get('text', '')
+                        press_enter = point.get('press_enter', False)
+                        pyautogui.write(text)
+                        if press_enter:
+                            pyautogui.press('enter')
                     elif action == 'drag':
                         target_x = point.get('target_x', x)
                         target_y = point.get('target_y', y)

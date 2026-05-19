@@ -153,7 +153,7 @@ class AppController:
         self.bridge.active_change.connect(self.overlay.highlight_point)
         
         # Check for updates asynchronously
-        self.update_checker = UpdateChecker("1.0.2")
+        self.update_checker = UpdateChecker("1.0.3")
         self.update_checker.update_available.connect(self.dashboard.show_update_notification)
         self.update_checker.start()
         

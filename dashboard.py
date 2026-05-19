@@ -181,7 +181,7 @@ class DashboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.cards = []
-        self.setWindowTitle("Advanced Auto Clicker v1.0.2")
+        self.setWindowTitle("Advanced Auto Clicker v1.0.3")
         self.setWindowIcon(QIcon(get_resource_path("icon.png")))
         self.setMinimumSize(550, 700)
         self.setStyleSheet(MAIN_STYLE)
@@ -196,7 +196,7 @@ class DashboardWindow(QMainWindow):
         
         # Header Section
         header_layout = QVBoxLayout()
-        title = QLabel("ADVANCED AUTO CLICKER v1.0.2")
+        title = QLabel("ADVANCED AUTO CLICKER v1.0.3")
         title.setObjectName("Title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
@@ -281,6 +281,7 @@ class DashboardWindow(QMainWindow):
         main_layout.addWidget(self.scroll)
         
         self.is_running = False
+        self.set_running_state(False)
 
     def _toggle_status(self):
         if self.is_running:
@@ -290,8 +291,11 @@ class DashboardWindow(QMainWindow):
 
     def set_running_state(self, running: bool):
         self.is_running = running
-        self.status_btn.setText("STOP (F6)" if running else "START (F6)")
-        self.status_btn.setStyleSheet("background-color: #f43f5e;" if running else "background-color: #22d3ee;")
+        self.status_btn.setText("STOP SEQUENCE (F6)" if running else "START SEQUENCE (F6)")
+        if running:
+            self.status_btn.setStyleSheet("background-color: #f43f5e; color: #ffffff; border: none; border-radius: 8px; font-weight: 600;")
+        else:
+            self.status_btn.setStyleSheet("background-color: #22d3ee; color: #0f172a; border: none; border-radius: 8px; font-weight: 600;")
 
     def show_update_notification(self, latest_version, download_url):
         self.update_label.setText(f"🚀 New Version Available: {latest_version}!")

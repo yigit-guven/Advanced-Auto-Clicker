@@ -39,6 +39,8 @@ QPushButton:hover {
 QPushButton#Primary {
     background-color: #22d3ee;
     color: #0f172a;
+    border: none;
+    border-radius: 8px;
 }
 
 QPushButton#Primary:hover {
@@ -48,6 +50,8 @@ QPushButton#Primary:hover {
 QPushButton#Danger {
     background-color: #f43f5e;
     color: #ffffff;
+    border: none;
+    border-radius: 8px;
 }
 
 QPushButton#Danger:hover {
@@ -69,12 +73,119 @@ QPushButton#GhostDanger:hover {
     border: 1px solid #f43f5e;
 }
 
-QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
+QLineEdit {
     background-color: #0f172a;
     border: 1px solid #334155;
     border-radius: 6px;
     padding: 5px;
     color: #f8fafc;
+}
+
+QSpinBox, QDoubleSpinBox {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 5px;
+    padding-right: 20px;
+    color: #f8fafc;
+}
+
+QSpinBox::up-button, QDoubleSpinBox::up-button {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #334155;
+    border-bottom: 0.5px solid #334155;
+    border-top-right-radius: 5px;
+    background-color: #1e293b;
+}
+
+QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {
+    background-color: #334155;
+}
+
+QSpinBox::down-button, QDoubleSpinBox::down-button {
+    subcontrol-origin: border;
+    subcontrol-position: bottom right;
+    width: 20px;
+    border-left: 1px solid #334155;
+    border-top: 0.5px solid #334155;
+    border-bottom-right-radius: 5px;
+    background-color: #1e293b;
+}
+
+QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {
+    background-color: #334155;
+}
+
+QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {
+    image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjEyIiBoZWlnaHQ9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNlMmU4ZjAiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIxOCAxNSAxMiA5IDYgMTUiLz48L3N2Zz4=");
+    width: 10px;
+    height: 10px;
+}
+
+QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {
+    image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjEyIiBoZWlnaHQ9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNlMmU4ZjAiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI2IDkgMTIgMTUgMTggOSIvPjwvc3ZnPg==");
+    width: 10px;
+    height: 10px;
+}
+
+QComboBox {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    border-radius: 6px;
+    padding: 5px;
+    padding-right: 25px;
+    color: #f8fafc;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: border;
+    subcontrol-position: top right;
+    width: 20px;
+    border-left: 1px solid #334155;
+    border-top-right-radius: 5px;
+    border-bottom-right-radius: 5px;
+    background-color: #1e293b;
+}
+
+QComboBox::drop-down:hover {
+    background-color: #334155;
+}
+
+QComboBox::down-arrow {
+    image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjEyIiBoZWlnaHQ9IjEyIiBmaWxsPSJub25lIiBzdHJva2U9IiNlMmU4ZjAiIHN0cm9rZS13aWR0aD0iMyIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSI2IDkgMTIgMTUgMTggOSIvPjwvc3ZnPg==");
+    width: 10px;
+    height: 10px;
+}
+
+QCheckBox {
+    spacing: 8px;
+    color: #e2e8f0;
+}
+
+QCheckBox::indicator {
+    width: 18px;
+    height: 18px;
+    border: 1px solid #334155;
+    border-radius: 4px;
+    background-color: #0f172a;
+}
+
+QCheckBox::indicator:hover {
+    border-color: #22d3ee;
+    background-color: #1e293b;
+}
+
+QCheckBox::indicator:checked {
+    background-color: #22d3ee;
+    border-color: #22d3ee;
+    image: url("data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCIgd2lkdGg9IjI0IiBmaWxsPSJub25lIiBzdHJva2U9IiMwZjE3MmEiIHN0cm9rZS13aWR0aD0iNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cG9seWxpbmUgcG9pbnRzPSIyMCA2IDkgMTcgNCAxMiIvPjwvc3ZnPg==");
+}
+
+QCheckBox::indicator:checked:hover {
+    background-color: #67e8f9;
+    border-color: #67e8f9;
 }
 
 QScrollArea {

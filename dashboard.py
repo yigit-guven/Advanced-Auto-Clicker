@@ -1,15 +1,25 @@
 
+import os
+import sys
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QScrollArea, QFrame, 
                              QComboBox, QDoubleSpinBox, QLineEdit, QCheckBox)
 from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QIcon
 from styles import MAIN_STYLE
+
+def get_resource_path(relative_path):
+    if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), relative_path)
 
 class PointConfigCard(QFrame):
     removed = pyqtSignal(int)
     updated = pyqtSignal(int, dict)
+    moved_up = pyqtSignal(int)
+    moved_down = pyqtSignal(int)
 
-    def __init__(self, index, data):
+    def __init__(self, index, data, total_count):
         super().__init__()
         self.setObjectName("Card")
         self.index = index
@@ -19,13 +29,32 @@ class PointConfigCard(QFrame):
         main_layout.setContentsMargins(15, 10, 15, 10)
         main_layout.setSpacing(10)
         
-        # Header Row: #Index | Position | Delete
+        # Header Row: #Index | Position | Order Buttons | Delete
         top_layout = QHBoxLayout()
         idx_label = QLabel(f"ACTION #{index + 1}")
         idx_label.setStyleSheet("font-weight: 800; color: #22d3ee; font-size: 16px;")
         
-        coord_label = QLabel(f"📍 {data['x']}, {data['y']}")
-        coord_label.setStyleSheet("font-size: 12px; color: #94a3b8;")
+        self.coord_label = QLabel(f"📍 {data['x']}, {data['y']}")
+        self.coord_label.setStyleSheet("font-size: 12px; color: #94a3b8;")
+        
+        # Reorder buttons
+        up_btn = QPushButton("▲")
+        up_btn.setObjectName("OrderBtn")
+        up_btn.setFixedSize(28, 28)
+        up_btn.setToolTip("Move up")
+        up_btn.clicked.connect(lambda: self.moved_up.emit(self.index))
+        if index == 0:
+            up_btn.setEnabled(False)
+            up_btn.setStyleSheet("color: #475569; background-color: #1e293b; border: 1px solid #334155;")
+            
+        down_btn = QPushButton("▼")
+        down_btn.setObjectName("OrderBtn")
+        down_btn.setFixedSize(28, 28)
+        down_btn.setToolTip("Move down")
+        down_btn.clicked.connect(lambda: self.moved_down.emit(self.index))
+        if index == total_count - 1:
+            down_btn.setEnabled(False)
+            down_btn.setStyleSheet("color: #475569; background-color: #1e293b; border: 1px solid #334155;")
         
         del_btn = QPushButton("X")
         del_btn.setObjectName("GhostDanger")
@@ -36,8 +65,11 @@ class PointConfigCard(QFrame):
         
         top_layout.addWidget(idx_label)
         top_layout.addStretch()
-        top_layout.addWidget(coord_label)
+        top_layout.addWidget(self.coord_label)
         top_layout.addSpacing(10)
+        top_layout.addWidget(up_btn)
+        top_layout.addWidget(down_btn)
+        top_layout.addSpacing(5)
         top_layout.addWidget(del_btn)
         main_layout.addLayout(top_layout)
 
@@ -132,16 +164,25 @@ class PointConfigCard(QFrame):
         }
         self.updated.emit(self.index, new_data)
 
+    def update_coordinates(self, x, y):
+        self.data['x'] = x
+        self.data['y'] = y
+        self.coord_label.setText(f"📍 {x}, {y}")
+
 class DashboardWindow(QMainWindow):
     start_requested = pyqtSignal()
     stop_requested = pyqtSignal()
     clear_requested = pyqtSignal()
     point_updated = pyqtSignal(int, dict)
     point_removed = pyqtSignal(int)
+    point_moved_up = pyqtSignal(int)
+    point_moved_down = pyqtSignal(int)
 
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Advanced Auto Clicker v1.0.1")
+        self.cards = []
+        self.setWindowTitle("Advanced Auto Clicker v1.0.2")
+        self.setWindowIcon(QIcon(get_resource_path("icon.png")))
         self.setMinimumSize(550, 700)
         self.setStyleSheet(MAIN_STYLE)
         
@@ -155,7 +196,7 @@ class DashboardWindow(QMainWindow):
         
         # Header Section
         header_layout = QVBoxLayout()
-        title = QLabel("ADVANCED AUTO CLICKER v1.0.1")
+        title = QLabel("ADVANCED AUTO CLICKER v1.0.2")
         title.setObjectName("Title")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(title)
@@ -165,6 +206,25 @@ class DashboardWindow(QMainWindow):
         subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(subtitle)
         main_layout.addLayout(header_layout)
+        
+        # Update Banner (Hidden by default)
+        self.update_banner = QFrame()
+        self.update_banner.setObjectName("UpdateBanner")
+        update_banner_layout = QHBoxLayout(self.update_banner)
+        update_banner_layout.setContentsMargins(15, 10, 15, 10)
+        
+        self.update_label = QLabel("🚀 Update Available!")
+        self.update_label.setStyleSheet("color: #0f172a; font-weight: bold; font-size: 13px; background: transparent;")
+        
+        self.update_btn = QPushButton("Download Now")
+        self.update_btn.setObjectName("UpdateBtn")
+        self.update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        update_banner_layout.addWidget(self.update_label)
+        update_banner_layout.addStretch()
+        update_banner_layout.addWidget(self.update_btn)
+        self.update_banner.hide()
+        main_layout.addWidget(self.update_banner)
         
         # Global Controls
         ctrl_card = QFrame()
@@ -213,6 +273,7 @@ class DashboardWindow(QMainWindow):
         self.scroll = QScrollArea()
         self.scroll.setWidgetResizable(True)
         self.list_widget = QWidget()
+        self.list_widget.setObjectName("ListWidget")
         self.list_layout = QVBoxLayout(self.list_widget)
         self.list_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.list_layout.setSpacing(15)
@@ -232,13 +293,40 @@ class DashboardWindow(QMainWindow):
         self.status_btn.setText("STOP (F6)" if running else "START (F6)")
         self.status_btn.setStyleSheet("background-color: #f43f5e;" if running else "background-color: #22d3ee;")
 
-    def refresh_list(self, points):
-        # Clear layout
-        for i in reversed(range(self.list_layout.count())): 
-            self.list_layout.itemAt(i).widget().setParent(None)
+    def show_update_notification(self, latest_version, download_url):
+        self.update_label.setText(f"🚀 New Version Available: {latest_version}!")
+        self.update_banner.show()
+        
+        # Disconnect any previous connections to avoid multiple opens
+        try:
+            self.update_btn.clicked.disconnect()
+        except TypeError:
+            pass
             
+        import webbrowser
+        self.update_btn.clicked.connect(lambda: webbrowser.open(download_url))
+
+    def refresh_list(self, points):
+        # Clear layout and delete widgets properly to prevent orphan windows
+        for i in reversed(range(self.list_layout.count())):
+            item = self.list_layout.itemAt(i)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)
+                    widget.deleteLater()
+        self.cards = []
+            
+        total_count = len(points)
         for i, pt in enumerate(points):
-            card = PointConfigCard(i, pt)
+            card = PointConfigCard(i, pt, total_count)
             card.removed.connect(self.point_removed.emit)
             card.updated.connect(self.point_updated.emit)
+            card.moved_up.connect(self.point_moved_up.emit)
+            card.moved_down.connect(self.point_moved_down.emit)
             self.list_layout.addWidget(card)
+            self.cards.append(card)
+
+    def update_point_coords(self, index, x, y):
+        if 0 <= index < len(self.cards):
+            self.cards[index].update_coordinates(x, y)

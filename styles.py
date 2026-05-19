@@ -69,7 +69,7 @@ QPushButton#GhostDanger:hover {
     border: 1px solid #f43f5e;
 }
 
-QLineEdit, QSpinBox, QComboBox {
+QLineEdit, QSpinBox, QDoubleSpinBox, QComboBox {
     background-color: #0f172a;
     border: 1px solid #334155;
     border-radius: 6px;
@@ -79,7 +79,19 @@ QLineEdit, QSpinBox, QComboBox {
 
 QScrollArea {
     border: none;
-    background-color: transparent;
+    background-color: #0f172a;
+}
+
+QWidget#ListWidget {
+    background-color: #0f172a;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #0f172a;
+    border: 1px solid #334155;
+    selection-background-color: #22d3ee;
+    selection-color: #0f172a;
+    color: #f8fafc;
 }
 
 QScrollBar:vertical {
@@ -97,6 +109,42 @@ QScrollBar::handle:vertical {
 
 QScrollBar::handle:vertical:hover {
     background: #475569;
+}
+
+QFrame#UpdateBanner {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #d97706, stop:1 #b45309);
+    border-radius: 8px;
+    border: 1px solid #f59e0b;
+}
+
+QPushButton#UpdateBtn {
+    background-color: #0f172a;
+    color: #fbbf24;
+    border-radius: 6px;
+    padding: 6px 12px;
+    font-weight: bold;
+    font-size: 12px;
+    border: 1px solid #fbbf24;
+}
+
+QPushButton#UpdateBtn:hover {
+    background-color: #1e293b;
+    color: #ffffff;
+}
+
+QPushButton#OrderBtn {
+    background-color: #334155;
+    color: #e2e8f0;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: bold;
+    padding: 0px;
+}
+
+QPushButton#OrderBtn:hover {
+    background-color: #475569;
+    color: #22d3ee;
 }
 """
 

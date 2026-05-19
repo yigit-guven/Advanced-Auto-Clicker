@@ -4,8 +4,9 @@ import os
 import shutil
 import time
 import subprocess
-from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread
+from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
+                             QLabel, QComboBox, QPushButton, QFormLayout)
+from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread, Qt
 from PyQt6.QtGui import QPalette, QColor
 from pynput import keyboard
 import pyautogui
@@ -22,6 +23,8 @@ def handle_exe_deduplication():
     current_exe_path = os.path.abspath(sys.executable)
     current_exe_dir = os.path.dirname(current_exe_path)
     current_exe_name = os.path.basename(current_exe_path)
+    if "installer" in current_exe_name.lower():
+        return
     
     target_exe_name = "AdvancedAutoClicker.exe"
     target_exe_path = os.path.join(current_exe_dir, target_exe_name)
@@ -103,16 +106,38 @@ class HotkeyListener(QObject):
 
     def __init__(self):
         super().__init__()
+        self.capture_key = "F7"
+        self.toggle_key = "F6"
+        self.clear_key = "F8"
         self.listener = keyboard.Listener(on_press=self._on_press)
         self.listener.start()
 
+    def update_keys(self, capture, toggle, clear):
+        self.capture_key = capture
+        self.toggle_key = toggle
+        self.clear_key = clear
+
+    def _key_matches(self, event_key, target_str):
+        try:
+            if target_str.upper().startswith("F"):
+                f_num = int(target_str[1:])
+                expected_key = getattr(keyboard.Key, f"f{f_num}", None)
+                if expected_key == event_key:
+                    return True
+            else:
+                if hasattr(event_key, 'char') and event_key.char == target_str.lower():
+                    return True
+        except Exception:
+            pass
+        return False
+
     def _on_press(self, key):
         try:
-            if key == keyboard.Key.f7:
+            if self._key_matches(key, self.capture_key):
                 self.capture_signal.emit()
-            elif key == keyboard.Key.f6:
+            elif self._key_matches(key, self.toggle_key):
                 self.toggle_signal.emit()
-            elif key == keyboard.Key.f8:
+            elif self._key_matches(key, self.clear_key):
                 self.clear_signal.emit()
         except AttributeError:
             pass
@@ -134,6 +159,79 @@ def setup_dark_theme(app):
     palette.setColor(QPalette.ColorRole.HighlightedText, QColor("#0f172a"))
     app.setPalette(palette)
 
+class SettingsDialog(QDialog):
+    def __init__(self, parent, current_theme, hotkeys):
+        super().__init__(parent)
+        self.setWindowTitle("Settings")
+        self.setMinimumWidth(380)
+        
+        # Apply the current theme stylesheet to the settings dialog so it inherits colors
+        from styles import get_theme_stylesheet
+        self.setStyleSheet(get_theme_stylesheet(current_theme))
+        
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(16)
+        
+        title_label = QLabel("SETTINGS")
+        title_label.setObjectName("Title")
+        layout.addWidget(title_label)
+        
+        form_layout = QFormLayout()
+        form_layout.setSpacing(12)
+        
+        # Appearance Section
+        theme_title = QLabel("Appearance")
+        theme_title.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 5px; color: #94a3b8;")
+        form_layout.addRow(theme_title)
+        
+        self.theme_combo = QComboBox()
+        self.theme_combo.addItems(["Dark Blue", "Light", "Matrix Green", "Sunset Purple"])
+        self.theme_combo.setCurrentText(current_theme)
+        form_layout.addRow("Theme:", self.theme_combo)
+        
+        # Hotkeys Section
+        hotkeys_title = QLabel("Hotkey Bindings")
+        hotkeys_title.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 15px; color: #94a3b8;")
+        form_layout.addRow(hotkeys_title)
+        
+        f_keys = [f"F{i}" for i in range(1, 13)]
+        
+        self.toggle_combo = QComboBox()
+        self.toggle_combo.addItems(f_keys)
+        self.toggle_combo.setCurrentText(hotkeys.get("toggle", "F6"))
+        form_layout.addRow("Start / Stop:", self.toggle_combo)
+        
+        self.capture_combo = QComboBox()
+        self.capture_combo.addItems(f_keys)
+        self.capture_combo.setCurrentText(hotkeys.get("capture", "F7"))
+        form_layout.addRow("Add Point:", self.capture_combo)
+        
+        self.clear_combo = QComboBox()
+        self.clear_combo.addItems(f_keys)
+        self.clear_combo.setCurrentText(hotkeys.get("clear", "F8"))
+        form_layout.addRow("Clear Sequence:", self.clear_combo)
+        
+        layout.addLayout(form_layout)
+        layout.addSpacing(10)
+        
+        # Custom styled action buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.clicked.connect(self.reject)
+        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        save_btn = QPushButton("Save Settings")
+        save_btn.setObjectName("Primary")
+        save_btn.clicked.connect(self.accept)
+        save_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(save_btn)
+        layout.addLayout(btn_layout)
+
 class AppController:
     def __init__(self):
         self.app = QApplication.instance()
@@ -153,7 +251,7 @@ class AppController:
         self.bridge.active_change.connect(self.overlay.highlight_point)
         
         # Check for updates asynchronously
-        self.update_checker = UpdateChecker("1.0.3")
+        self.update_checker = UpdateChecker("1.0.4")
         self.update_checker.update_available.connect(self.dashboard.show_update_notification)
         self.update_checker.start()
         
@@ -165,6 +263,7 @@ class AppController:
         self.dashboard.point_removed.connect(self.remove_point)
         self.dashboard.point_moved_up.connect(self.move_point_up)
         self.dashboard.point_moved_down.connect(self.move_point_down)
+        self.dashboard.settings_requested.connect(self.show_settings_dialog)
         
         # Connect Overlay Signals
         self.overlay.point_moved.connect(self.move_point)
@@ -175,7 +274,91 @@ class AppController:
         self.hotkeys.toggle_signal.connect(self.toggle_engine)
         self.hotkeys.clear_signal.connect(self.clear_points)
         
+        self.load_config()
+        self.refresh_ui()
         self.dashboard.show()
+
+    def get_config_path(self):
+        base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
+        return os.path.join(base_dir, "config.json")
+
+    def apply_theme(self, theme_name):
+        self.dashboard.apply_theme(theme_name)
+        self.overlay.apply_theme(theme_name)
+
+    def show_settings_dialog(self):
+        current_hotkeys = {
+            "capture": self.hotkeys.capture_key,
+            "toggle": self.hotkeys.toggle_key,
+            "clear": self.hotkeys.clear_key
+        }
+        dialog = SettingsDialog(self.dashboard, self.dashboard.current_theme, current_hotkeys)
+        if dialog.exec():
+            new_theme = dialog.theme_combo.currentText()
+            new_capture = dialog.capture_combo.currentText()
+            new_toggle = dialog.toggle_combo.currentText()
+            new_clear = dialog.clear_combo.currentText()
+            
+            # Apply theme
+            self.apply_theme(new_theme)
+            
+            # Apply hotkeys
+            self.hotkeys.update_keys(new_capture, new_toggle, new_clear)
+            self.dashboard.update_hotkey_labels(new_capture, new_toggle, new_clear)
+            
+            # Save config
+            self.save_config()
+
+    def load_config(self):
+        try:
+            path = self.get_config_path()
+            theme_name = "Dark Blue"
+            capture_key = "F7"
+            toggle_key = "F6"
+            clear_key = "F8"
+            if os.path.exists(path):
+                import json
+                with open(path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    self.points = data.get("points", [])
+                    theme_name = data.get("theme", "Dark Blue")
+                    capture_key = data.get("capture_key", "F7")
+                    toggle_key = data.get("toggle_key", "F6")
+                    clear_key = data.get("clear_key", "F8")
+                else:
+                    self.points = data
+                for p in self.points:
+                    p.setdefault("x", 0)
+                    p.setdefault("y", 0)
+                    p.setdefault("action", "left_click")
+                    p.setdefault("delay_before", 0.1)
+                    p.setdefault("delay_after", 0.1)
+                    p.setdefault("key", "a")
+                    p.setdefault("duration", 1.0)
+                    p.setdefault("text", "Hello World!")
+                    p.setdefault("press_enter", False)
+            self.apply_theme(theme_name)
+            self.hotkeys.update_keys(capture_key, toggle_key, clear_key)
+            self.dashboard.update_hotkey_labels(capture_key, toggle_key, clear_key)
+        except Exception as e:
+            print(f"Failed to load config: {e}")
+
+    def save_config(self):
+        try:
+            path = self.get_config_path()
+            import json
+            data = {
+                "theme": self.dashboard.current_theme,
+                "capture_key": self.hotkeys.capture_key,
+                "toggle_key": self.hotkeys.toggle_key,
+                "clear_key": self.hotkeys.clear_key,
+                "points": self.points
+            }
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"Failed to save config: {e}")
 
     def capture_point(self):
         x, y = pyautogui.position()
@@ -192,37 +375,44 @@ class AppController:
         }
         self.points.append(new_point)
         self.refresh_ui()
+        self.save_config()
 
     def update_point(self, index, data):
         if 0 <= index < len(self.points):
             self.points[index] = data
             self.overlay.update_points(self.points)
+            self.save_config()
 
     def move_point(self, index, x, y):
         if 0 <= index < len(self.points):
             self.points[index]["x"] = x
             self.points[index]["y"] = y
             self.dashboard.update_point_coords(index, x, y)
+            self.save_config()
 
     def move_point_up(self, index):
         if 0 < index < len(self.points):
             self.points[index], self.points[index - 1] = self.points[index - 1], self.points[index]
             self.refresh_ui()
+            self.save_config()
 
     def move_point_down(self, index):
         if 0 <= index < len(self.points) - 1:
             self.points[index], self.points[index + 1] = self.points[index + 1], self.points[index]
             self.refresh_ui()
+            self.save_config()
 
     def remove_point(self, index):
         if 0 <= index < len(self.points):
             self.points.pop(index)
             self.refresh_ui()
+            self.save_config()
 
     def clear_points(self):
         self.points = []
         self.refresh_ui()
         self.stop_engine()
+        self.save_config()
 
     def refresh_ui(self):
         self.dashboard.refresh_list(self.points)
@@ -254,8 +444,10 @@ if __name__ == "__main__":
     
     # Check if we should show the installer wizard
     if getattr(sys, 'frozen', False) and "--cleanup" not in sys.argv:
+        from installer import get_previous_install_dir
         local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
-        installed_dir = os.path.join(local_appdata, "Programs", "AdvancedAutoClicker")
+        reg_dir = get_previous_install_dir()
+        installed_dir = reg_dir if reg_dir else os.path.join(local_appdata, "Programs", "AdvancedAutoClicker")
         installed_exe = os.path.join(installed_dir, "AdvancedAutoClicker.exe")
         
         current_exe = os.path.abspath(sys.executable)

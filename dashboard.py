@@ -32,7 +32,7 @@ class PointConfigCard(QFrame):
         # Header Row: #Index | Position | Order Buttons | Delete
         top_layout = QHBoxLayout()
         idx_label = QLabel(f"ACTION #{index + 1}")
-        idx_label.setStyleSheet("font-weight: 800; color: #22d3ee; font-size: 16px;")
+        idx_label.setObjectName("ActionHeader")
         
         self.coord_label = QLabel(f"📍 {data['x']}, {data['y']}")
         self.coord_label.setStyleSheet("font-size: 12px; color: #94a3b8;")
@@ -45,7 +45,6 @@ class PointConfigCard(QFrame):
         up_btn.clicked.connect(lambda: self.moved_up.emit(self.index))
         if index == 0:
             up_btn.setEnabled(False)
-            up_btn.setStyleSheet("color: #475569; background-color: #1e293b; border: 1px solid #334155;")
             
         down_btn = QPushButton("▼")
         down_btn.setObjectName("OrderBtn")
@@ -54,7 +53,6 @@ class PointConfigCard(QFrame):
         down_btn.clicked.connect(lambda: self.moved_down.emit(self.index))
         if index == total_count - 1:
             down_btn.setEnabled(False)
-            down_btn.setStyleSheet("color: #475569; background-color: #1e293b; border: 1px solid #334155;")
         
         del_btn = QPushButton("X")
         del_btn.setObjectName("GhostDanger")
@@ -177,11 +175,14 @@ class DashboardWindow(QMainWindow):
     point_removed = pyqtSignal(int)
     point_moved_up = pyqtSignal(int)
     point_moved_down = pyqtSignal(int)
+    theme_changed = pyqtSignal(str)
+    settings_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.cards = []
-        self.setWindowTitle("Advanced Auto Clicker v1.0.3")
+        self.current_theme = "Dark Blue"
+        self.setWindowTitle("Advanced Auto Clicker v1.0.4")
         self.setWindowIcon(QIcon(get_resource_path("icon.png")))
         self.setMinimumSize(550, 700)
         self.setStyleSheet(MAIN_STYLE)
@@ -196,15 +197,28 @@ class DashboardWindow(QMainWindow):
         
         # Header Section
         header_layout = QVBoxLayout()
-        title = QLabel("ADVANCED AUTO CLICKER v1.0.3")
-        title.setObjectName("Title")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header_layout.addWidget(title)
         
-        subtitle = QLabel("Design your sequence, then press F6 to run")
-        subtitle.setStyleSheet("color: #94a3b8; font-size: 14px; margin-bottom: 10px;")
-        subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header_layout.addWidget(subtitle)
+        # Title and Settings row
+        title_row = QHBoxLayout()
+        
+        title = QLabel("ADVANCED AUTO CLICKER v1.0.4")
+        title.setObjectName("Title")
+        title_row.addWidget(title)
+        title_row.addStretch()
+        
+        self.settings_btn = QPushButton("⚙ Settings")
+        self.settings_btn.setObjectName("SettingsBtn")
+        self.settings_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.settings_btn.clicked.connect(self._on_settings_clicked)
+        title_row.addWidget(self.settings_btn)
+        
+        header_layout.addLayout(title_row)
+        
+        self.subtitle = QLabel("Design your sequence, then press F6 to run")
+        self.subtitle.setStyleSheet("color: #94a3b8; font-size: 14px; margin-bottom: 10px;")
+        self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_layout.addWidget(self.subtitle)
+        
         main_layout.addLayout(header_layout)
         
         # Update Banner (Hidden by default)
@@ -229,7 +243,6 @@ class DashboardWindow(QMainWindow):
         # Global Controls
         ctrl_card = QFrame()
         ctrl_card.setObjectName("Card")
-        ctrl_card.setStyleSheet("background-color: #1e293b; border: 2px solid #334155;")
         ctrl_layout = QHBoxLayout(ctrl_card)
         
         self.status_btn = QPushButton("START SEQUENCE (F6)")
@@ -254,13 +267,17 @@ class DashboardWindow(QMainWindow):
             l.setStyleSheet(f"background-color: {color}; color: #0f172a; padding: 4px 8px; border-radius: 4px; font-weight: bold; font-size: 11px;")
             return l
 
-        guide_layout.addWidget(create_badge("F7", "#22d3ee"))
+        self.badge_capture = create_badge("F7", "#22d3ee")
+        self.badge_toggle = create_badge("F6", "#fbbf24")
+        self.badge_clear = create_badge("F8", "#f43f5e")
+
+        guide_layout.addWidget(self.badge_capture)
         guide_layout.addWidget(QLabel("Add Point"))
         guide_layout.addStretch()
-        guide_layout.addWidget(create_badge("F6", "#fbbf24"))
+        guide_layout.addWidget(self.badge_toggle)
         guide_layout.addWidget(QLabel("Run/Stop"))
         guide_layout.addStretch()
-        guide_layout.addWidget(create_badge("F8", "#f43f5e"))
+        guide_layout.addWidget(self.badge_clear)
         guide_layout.addWidget(QLabel("Clear"))
         main_layout.addLayout(guide_layout)
         
@@ -289,13 +306,31 @@ class DashboardWindow(QMainWindow):
         else:
             self.start_requested.emit()
 
+    def _on_settings_clicked(self):
+        self.settings_requested.emit()
+
+    def update_hotkey_labels(self, capture, toggle, clear):
+        self.subtitle.setText(f"Design your sequence, then press {toggle} to run")
+        self.badge_capture.setText(capture)
+        self.badge_toggle.setText(toggle)
+        self.badge_clear.setText(clear)
+        self.status_btn.setText(f"STOP SEQUENCE ({toggle})" if self.is_running else f"START SEQUENCE ({toggle})")
+
+    def apply_theme(self, theme_name):
+        self.current_theme = theme_name
+        from styles import get_theme_stylesheet
+        self.setStyleSheet(get_theme_stylesheet(theme_name))
+        self.set_running_state(self.is_running)
+
     def set_running_state(self, running: bool):
         self.is_running = running
         self.status_btn.setText("STOP SEQUENCE (F6)" if running else "START SEQUENCE (F6)")
+        from styles import THEMES
+        theme_data = THEMES.get(self.current_theme, THEMES["Dark Blue"])
         if running:
             self.status_btn.setStyleSheet("background-color: #f43f5e; color: #ffffff; border: none; border-radius: 8px; font-weight: 600;")
         else:
-            self.status_btn.setStyleSheet("background-color: #22d3ee; color: #0f172a; border: none; border-radius: 8px; font-weight: 600;")
+            self.status_btn.setStyleSheet(f"background-color: {theme_data['primary']}; color: {theme_data['btn_primary_text']}; border: none; border-radius: 8px; font-weight: 600;")
 
     def show_update_notification(self, latest_version, download_url):
         self.update_label.setText(f"🚀 New Version Available: {latest_version}!")

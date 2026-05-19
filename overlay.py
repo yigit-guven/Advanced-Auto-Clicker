@@ -8,9 +8,10 @@ class OverlayCircle(QFrame):
     moved = pyqtSignal(int, int, int)  # index, x, y
     removed = pyqtSignal(int)
 
-    def __init__(self, parent, x, y, index):
+    def __init__(self, parent, x, y, index, theme_name="Dark Blue"):
         super().__init__(parent)
         self.index = index
+        self.theme_name = theme_name
         self.setFixedSize(80, 80)  # Larger to accommodate buttons
         self.move(x - 40, y - 40)
         
@@ -18,23 +19,12 @@ class OverlayCircle(QFrame):
         self.circle = QLabel(str(index + 1), self)
         self.circle.setFixedSize(50, 50)
         self.circle.move(15, 15)
-        self.circle.setStyleSheet(OVERLAY_STYLE)
         self.circle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         
         # Delete Button (Top Right)
         self.del_btn = QPushButton("×", self)
         self.del_btn.setFixedSize(22, 22)
         self.del_btn.move(50, 0)
-        self.del_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #f43f5e;
-                color: white;
-                border-radius: 11px;
-                font-weight: bold;
-                border: 2px solid #0f172a;
-            }
-            QPushButton:hover { background-color: #fb7185; }
-        """)
         self.del_btn.clicked.connect(lambda: self.removed.emit(self.index))
         self.del_btn.hide()
         
@@ -42,18 +32,39 @@ class OverlayCircle(QFrame):
         self.drag_handle = QLabel("✥", self)
         self.drag_handle.setFixedSize(22, 22)
         self.drag_handle.move(5, 50)
-        self.drag_handle.setStyleSheet("""
-            background-color: #22d3ee;
-            color: #0f172a;
-            border-radius: 11px;
-            font-weight: bold;
-            border: 2px solid #0f172a;
-            qproperty-alignment: 'AlignCenter';
-        """)
         self.drag_handle.hide()
+        
+        self.apply_theme(theme_name)
         
         self.dragging = False
         self.drag_start_pos = QPoint()
+
+    def apply_theme(self, theme_name):
+        self.theme_name = theme_name
+        from styles import get_overlay_stylesheet, THEMES
+        theme_data = THEMES.get(theme_name, THEMES["Dark Blue"])
+        
+        self.circle.setStyleSheet(get_overlay_stylesheet(theme_name))
+        
+        self.drag_handle.setStyleSheet(f"""
+            background-color: {theme_data["primary"]};
+            color: {theme_data["btn_primary_text"]};
+            border-radius: 11px;
+            font-weight: bold;
+            border: 2px solid {theme_data["bg_main"]};
+            qproperty-alignment: 'AlignCenter';
+        """)
+        
+        self.del_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #f43f5e;
+                color: white;
+                border-radius: 11px;
+                font-weight: bold;
+                border: 2px solid {theme_data["bg_main"]};
+            }}
+            QPushButton:hover {{ background-color: #fb7185; }}
+        """)
 
     def enterEvent(self, event):
         if not self.window().is_running:
@@ -90,10 +101,11 @@ class OverlayCircle(QFrame):
         super().mouseReleaseEvent(event)
 
     def set_active(self, active=True):
+        from styles import get_overlay_stylesheet
         if active:
-            self.circle.setStyleSheet(OVERLAY_STYLE + "border: 4px solid #f472b6; background-color: rgba(244, 114, 182, 0.4);")
+            self.circle.setStyleSheet(get_overlay_stylesheet(self.theme_name) + "border: 4px solid #f472b6; background-color: rgba(244, 114, 182, 0.4);")
         else:
-            self.circle.setStyleSheet(OVERLAY_STYLE)
+            self.circle.setStyleSheet(get_overlay_stylesheet(self.theme_name))
 
 class OverlayWindow(QWidget):
     point_moved = pyqtSignal(int, int, int)
@@ -110,7 +122,13 @@ class OverlayWindow(QWidget):
         self.showFullScreen()
         self.circles = []
         self.is_running = False
+        self.theme_name = "Dark Blue"
         self.update_mask()
+
+    def apply_theme(self, theme_name):
+        self.theme_name = theme_name
+        for circle in self.circles:
+            circle.apply_theme(theme_name)
 
     def set_running(self, running):
         self.is_running = running
@@ -141,7 +159,7 @@ class OverlayWindow(QWidget):
         
         # Add new circles
         for i, pt in enumerate(points):
-            circle = OverlayCircle(self, pt['x'], pt['y'], i)
+            circle = OverlayCircle(self, pt['x'], pt['y'], i, self.theme_name)
             circle.moved.connect(self.point_moved.emit)
             circle.removed.connect(self.point_removed.emit)
             circle.show()

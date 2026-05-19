@@ -3,6 +3,7 @@ import sys
 import shutil
 import subprocess
 import time
+import winreg
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                              QPushButton, QLineEdit, QCheckBox, QFileDialog, 
                              QProgressBar, QStackedWidget, QWidget, QFrame)
@@ -10,15 +11,33 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from styles import MAIN_STYLE
 
+def get_previous_install_dir():
+    try:
+        key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\AdvancedAutoClicker", 0, winreg.KEY_READ)
+        val, _ = winreg.QueryValueEx(key, "InstallDir")
+        winreg.CloseKey(key)
+        return val
+    except Exception:
+        return None
+
+def set_install_dir(path):
+    try:
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, r"Software\AdvancedAutoClicker")
+        winreg.SetValueEx(key, "InstallDir", 0, winreg.REG_SZ, path)
+        winreg.CloseKey(key)
+    except Exception as e:
+        print(f"Failed to write registry: {e}")
+
 class InstallationWorker(QThread):
     progress = pyqtSignal(int)
     completed = pyqtSignal(bool, str)
 
-    def __init__(self, install_dir, create_desktop, create_start_menu):
+    def __init__(self, install_dir, create_desktop, create_start_menu, keep_config):
         super().__init__()
         self.install_dir = install_dir
         self.create_desktop = create_desktop
         self.create_start_menu = create_start_menu
+        self.keep_config = keep_config
 
     def run(self):
         try:
@@ -27,9 +46,25 @@ class InstallationWorker(QThread):
             
             # Create destination folder
             os.makedirs(self.install_dir, exist_ok=True)
+            
+            # Manage config file reset/keep
+            config_file = os.path.join(self.install_dir, "config.json")
+            if os.path.exists(config_file) and not self.keep_config:
+                try:
+                    os.remove(config_file)
+                except Exception:
+                    pass
+
             self.progress.emit(30)
             time.sleep(0.3)
             
+            # Terminate any running instances of AdvancedAutoClicker.exe to release file locks
+            try:
+                subprocess.run(["taskkill", "/f", "/im", "AdvancedAutoClicker.exe"], capture_output=True)
+                time.sleep(0.5)
+            except Exception:
+                pass
+
             # Copy executable
             current_exe = os.path.abspath(sys.executable)
             target_exe = os.path.join(self.install_dir, "AdvancedAutoClicker.exe")
@@ -43,6 +78,10 @@ class InstallationWorker(QThread):
                     os.remove(target_exe)
                     
             shutil.copy2(current_exe, target_exe)
+            
+            # Save installation path to registry for future updates
+            set_install_dir(self.install_dir)
+
             self.progress.emit(60)
             time.sleep(0.3)
             
@@ -168,7 +207,8 @@ class InstallerWindow(QDialog):
         
         path_layout = QHBoxLayout()
         local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
-        self.default_dir = os.path.join(local_appdata, "Programs", "AdvancedAutoClicker")
+        reg_dir = get_previous_install_dir()
+        self.default_dir = reg_dir if reg_dir else os.path.join(local_appdata, "Programs", "AdvancedAutoClicker")
         
         self.path_input = QLineEdit(self.default_dir)
         self.path_input.setStyleSheet("padding: 8px;")
@@ -189,6 +229,10 @@ class InstallerWindow(QDialog):
         self.start_menu_check = QCheckBox("Create Start Menu shortcut")
         self.start_menu_check.setChecked(True)
         layout.addWidget(self.start_menu_check)
+        
+        self.keep_config_check = QCheckBox("Keep existing configuration / sequences")
+        self.keep_config_check.setChecked(True)
+        layout.addWidget(self.keep_config_check)
         
         layout.addStretch()
         
@@ -291,7 +335,8 @@ class InstallerWindow(QDialog):
         self.worker = InstallationWorker(
             self.path_input.text(),
             self.desktop_check.isChecked(),
-            self.start_menu_check.isChecked()
+            self.start_menu_check.isChecked(),
+            self.keep_config_check.isChecked()
         )
         self.worker.progress.connect(self._on_progress)
         self.worker.completed.connect(self._on_completed)

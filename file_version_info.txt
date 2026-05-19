@@ -1,8 +1,8 @@
 # UTF-8
 VSVersionInfo(
   ffi=FixedFileInfo(
-    filevers=(1, 0, 4, 0),
-    prodvers=(1, 0, 4, 0),
+    filevers=(1, 0, 5, 0),
+    prodvers=(1, 0, 5, 0),
     mask=0x3f,
     flags=0x0,
     OS=0x40004,
@@ -19,12 +19,12 @@ VSVersionInfo(
           [
             StringStruct(u'CompanyName', u'Yi\u011fit G\u00fcven'),
             StringStruct(u'FileDescription', u'Advanced Auto Clicker Installer'),
-            StringStruct(u'FileVersion', u'1.0.4.0'),
+            StringStruct(u'FileVersion', u'1.0.5.0'),
             StringStruct(u'InternalName', u'AdvancedAutoClickerInstaller'),
             StringStruct(u'LegalCopyright', u'Copyright (c) 2026 Yi\u011fit G\u00fcven. MIT License.'),
-            StringStruct(u'OriginalFilename', u'AdvancedAutoClickerInstaller_1.0.4.exe'),
+            StringStruct(u'OriginalFilename', u'AdvancedAutoClickerInstaller_1.0.5.exe'),
             StringStruct(u'ProductName', u'Advanced Auto Clicker'),
-            StringStruct(u'ProductVersion', u'1.0.4.0')
+            StringStruct(u'ProductVersion', u'1.0.5.0')
           ]
         )
       ]

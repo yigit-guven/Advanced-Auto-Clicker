@@ -7,6 +7,7 @@ from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 from styles import MAIN_STYLE
+from version import VERSION
 
 def get_resource_path(relative_path):
     if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
@@ -182,7 +183,7 @@ class DashboardWindow(QMainWindow):
         super().__init__()
         self.cards = []
         self.current_theme = "Dark Blue"
-        self.setWindowTitle("Advanced Auto Clicker v1.0.4")
+        self.setWindowTitle(f"Advanced Auto Clicker v{VERSION}")
         self.setWindowIcon(QIcon(get_resource_path("icon.png")))
         self.setMinimumSize(550, 700)
         self.setStyleSheet(MAIN_STYLE)
@@ -201,7 +202,7 @@ class DashboardWindow(QMainWindow):
         # Title and Settings row
         title_row = QHBoxLayout()
         
-        title = QLabel("ADVANCED AUTO CLICKER v1.0.4")
+        title = QLabel(f"ADVANCED AUTO CLICKER v{VERSION}")
         title.setObjectName("Title")
         title_row.addWidget(title)
         title_row.addStretch()

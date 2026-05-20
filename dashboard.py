@@ -3,7 +3,8 @@ import os
 import sys
 from PyQt6.QtWidgets import (QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, 
                              QPushButton, QLabel, QScrollArea, QFrame, 
-                             QComboBox, QDoubleSpinBox, QLineEdit, QCheckBox)
+                             QComboBox, QDoubleSpinBox, QLineEdit, QCheckBox,
+                             QInputDialog, QMessageBox)
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QIcon
 from styles import MAIN_STYLE
@@ -180,6 +181,9 @@ class DashboardWindow(QMainWindow):
     point_moved_down = pyqtSignal(int)
     theme_changed = pyqtSignal(str)
     settings_requested = pyqtSignal()
+    profile_changed = pyqtSignal(str)
+    save_profile_requested = pyqtSignal(str)
+    delete_profile_requested = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -221,6 +225,26 @@ class DashboardWindow(QMainWindow):
         self.subtitle.setStyleSheet("color: #94a3b8; font-size: 14px; margin-bottom: 10px;")
         self.subtitle.setAlignment(Qt.AlignmentFlag.AlignCenter)
         header_layout.addWidget(self.subtitle)
+        
+        # Profile Section
+        profile_layout = QHBoxLayout()
+        profile_layout.addWidget(QLabel("Profile:"))
+        self.profile_combo = QComboBox()
+        self.profile_combo.currentTextChanged.connect(self._on_profile_combo_changed)
+        profile_layout.addWidget(self.profile_combo, 1)
+        
+        self.save_profile_btn = QPushButton("Save As")
+        self.save_profile_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.save_profile_btn.clicked.connect(self._on_save_profile_clicked)
+        profile_layout.addWidget(self.save_profile_btn)
+        
+        self.del_profile_btn = QPushButton("Delete")
+        self.del_profile_btn.setObjectName("GhostDanger")
+        self.del_profile_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.del_profile_btn.clicked.connect(self._on_delete_profile_clicked)
+        profile_layout.addWidget(self.del_profile_btn)
+        
+        header_layout.addLayout(profile_layout)
         
         main_layout.addLayout(header_layout)
         
@@ -311,6 +335,30 @@ class DashboardWindow(QMainWindow):
 
     def _on_settings_clicked(self):
         self.settings_requested.emit()
+
+    def _on_profile_combo_changed(self, text):
+        if text:
+            self.profile_changed.emit(text)
+
+    def _on_save_profile_clicked(self):
+        name, ok = QInputDialog.getText(self, "Save Profile", "Enter new profile name:")
+        if ok and name.strip():
+            self.save_profile_requested.emit(name.strip())
+            
+    def _on_delete_profile_clicked(self):
+        current = self.profile_combo.currentText()
+        if current:
+            reply = QMessageBox.question(self, "Delete Profile", f"Are you sure you want to delete profile '{current}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.delete_profile_requested.emit(current)
+
+    def set_profiles(self, profiles, current):
+        self.profile_combo.blockSignals(True)
+        self.profile_combo.clear()
+        self.profile_combo.addItems(profiles)
+        self.profile_combo.setCurrentText(current)
+        self.del_profile_btn.setEnabled(len(profiles) > 1)
+        self.profile_combo.blockSignals(False)
 
     def update_hotkey_labels(self, capture, toggle, clear):
         self.subtitle.setText(f"Design your sequence, then press {toggle} to run")

@@ -240,6 +240,8 @@ class AppController:
             self.app = QApplication(sys.argv)
             setup_dark_theme(self.app)
         
+        self.profiles = {"Default": []}
+        self.current_profile = "Default"
         self.points = []
         
         self.dashboard = DashboardWindow()
@@ -265,6 +267,9 @@ class AppController:
         self.dashboard.point_moved_up.connect(self.move_point_up)
         self.dashboard.point_moved_down.connect(self.move_point_down)
         self.dashboard.settings_requested.connect(self.show_settings_dialog)
+        self.dashboard.profile_changed.connect(self.on_profile_changed)
+        self.dashboard.save_profile_requested.connect(self.on_save_profile)
+        self.dashboard.delete_profile_requested.connect(self.on_delete_profile)
         
         # Connect Overlay Signals
         self.overlay.point_moved.connect(self.move_point)
@@ -317,19 +322,32 @@ class AppController:
             capture_key = "F7"
             toggle_key = "F6"
             clear_key = "F8"
+            self.profiles = {"Default": []}
+            self.current_profile = "Default"
+            
             if os.path.exists(path):
                 import json
                 with open(path, "r", encoding="utf-8") as f:
                     data = json.load(f)
                 if isinstance(data, dict):
-                    self.points = data.get("points", [])
+                    if "profiles" in data:
+                        self.profiles = data["profiles"]
+                        self.current_profile = data.get("current_profile", list(self.profiles.keys())[0])
+                    else:
+                        legacy_points = data.get("points", [])
+                        self.profiles = {"Default": legacy_points}
+                        self.current_profile = "Default"
+
                     theme_name = data.get("theme", "Dark Blue")
                     capture_key = data.get("capture_key", "F7")
                     toggle_key = data.get("toggle_key", "F6")
                     clear_key = data.get("clear_key", "F8")
                 else:
-                    self.points = data
-                for p in self.points:
+                    self.profiles = {"Default": data}
+                    self.current_profile = "Default"
+            
+            for prof_name, pts in self.profiles.items():
+                for p in pts:
                     p.setdefault("x", 0)
                     p.setdefault("y", 0)
                     p.setdefault("action", "left_click")
@@ -339,6 +357,8 @@ class AppController:
                     p.setdefault("duration", 1.0)
                     p.setdefault("text", "Hello World!")
                     p.setdefault("press_enter", False)
+            
+            self.points = self.profiles.get(self.current_profile, [])
             self.apply_theme(theme_name)
             self.hotkeys.update_keys(capture_key, toggle_key, clear_key)
             self.dashboard.update_hotkey_labels(capture_key, toggle_key, clear_key)
@@ -347,6 +367,7 @@ class AppController:
 
     def save_config(self):
         try:
+            self.profiles[self.current_profile] = self.points
             path = self.get_config_path()
             import json
             data = {
@@ -354,7 +375,8 @@ class AppController:
                 "capture_key": self.hotkeys.capture_key,
                 "toggle_key": self.hotkeys.toggle_key,
                 "clear_key": self.hotkeys.clear_key,
-                "points": self.points
+                "profiles": self.profiles,
+                "current_profile": self.current_profile
             }
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
@@ -416,8 +438,37 @@ class AppController:
         self.save_config()
 
     def refresh_ui(self):
+        self.dashboard.set_profiles(list(self.profiles.keys()), self.current_profile)
         self.dashboard.refresh_list(self.points)
         self.overlay.update_points(self.points)
+
+    def on_profile_changed(self, name):
+        if name in self.profiles and name != self.current_profile:
+            self.stop_engine()
+            self.profiles[self.current_profile] = self.points
+            self.current_profile = name
+            self.points = self.profiles[name]
+            self.refresh_ui()
+            self.save_config()
+
+    def on_save_profile(self, new_name):
+        self.profiles[self.current_profile] = self.points
+        if new_name not in self.profiles:
+            import copy
+            self.profiles[new_name] = copy.deepcopy(self.points)
+        
+        self.current_profile = new_name
+        self.points = self.profiles[new_name]
+        self.refresh_ui()
+        self.save_config()
+
+    def on_delete_profile(self, name):
+        if name in self.profiles and len(self.profiles) > 1:
+            del self.profiles[name]
+            self.current_profile = list(self.profiles.keys())[0]
+            self.points = self.profiles[self.current_profile]
+            self.refresh_ui()
+            self.save_config()
 
     def start_engine(self):
         if not self.points: return

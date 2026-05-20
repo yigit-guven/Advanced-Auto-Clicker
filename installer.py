@@ -28,6 +28,21 @@ def set_install_dir(path):
     except Exception as e:
         print(f"Failed to write registry: {e}")
 
+def register_uninstaller(install_dir, target_exe):
+    try:
+        from version import VERSION
+        key_path = r"Software\Microsoft\Windows\CurrentVersion\Uninstall\AdvancedAutoClicker"
+        key = winreg.CreateKey(winreg.HKEY_CURRENT_USER, key_path)
+        winreg.SetValueEx(key, "DisplayName", 0, winreg.REG_SZ, "Advanced Auto Clicker")
+        winreg.SetValueEx(key, "DisplayVersion", 0, winreg.REG_SZ, VERSION)
+        winreg.SetValueEx(key, "Publisher", 0, winreg.REG_SZ, "Yigit Guven")
+        winreg.SetValueEx(key, "DisplayIcon", 0, winreg.REG_SZ, f'"{target_exe}",0')
+        winreg.SetValueEx(key, "UninstallString", 0, winreg.REG_SZ, f'"{target_exe}" --uninstall')
+        winreg.SetValueEx(key, "InstallLocation", 0, winreg.REG_SZ, install_dir)
+        winreg.CloseKey(key)
+    except Exception as e:
+        print(f"Failed to register uninstaller: {e}")
+
 class InstallationWorker(QThread):
     progress = pyqtSignal(int)
     completed = pyqtSignal(bool, str)
@@ -81,6 +96,7 @@ class InstallationWorker(QThread):
             
             # Save installation path to registry for future updates
             set_install_dir(self.install_dir)
+            register_uninstaller(self.install_dir, target_exe)
 
             self.progress.emit(60)
             time.sleep(0.3)

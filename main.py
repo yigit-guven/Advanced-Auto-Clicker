@@ -491,10 +491,63 @@ class AppController:
     def run(self):
         sys.exit(self.app.exec())
 
+def handle_uninstallation():
+    from PyQt6.QtWidgets import QApplication, QMessageBox
+    import winreg
+    
+    app = QApplication(sys.argv)
+    reply = QMessageBox.question(None, "Uninstall Advanced Auto Clicker", 
+                                 "Are you sure you want to completely remove Advanced Auto Clicker and all of its components?", 
+                                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+    if reply == QMessageBox.StandardButton.Yes:
+        desktop_dir = os.path.expanduser("~\\Desktop")
+        appdata = os.environ.get("APPDATA", os.path.expanduser("~\\AppData\\Roaming"))
+        start_menu_dir = os.path.join(appdata, "Microsoft\\Windows\\Start Menu\\Programs")
+        
+        shortcut_desktop = os.path.join(desktop_dir, "Advanced Auto Clicker.lnk")
+        shortcut_start = os.path.join(start_menu_dir, "Advanced Auto Clicker.lnk")
+        
+        for p in [shortcut_desktop, shortcut_start]:
+            if os.path.exists(p):
+                try:
+                    os.remove(p)
+                except Exception:
+                    pass
+        
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall\AdvancedAutoClicker")
+        except Exception:
+            pass
+        try:
+            winreg.DeleteKey(winreg.HKEY_CURRENT_USER, r"Software\AdvancedAutoClicker")
+        except Exception:
+            pass
+            
+        import tempfile
+        install_dir = os.path.dirname(os.path.abspath(sys.executable))
+        temp_bat = os.path.join(tempfile.gettempdir(), "uninstall_aac.bat")
+        
+        bat_content = f"""@echo off
+timeout /t 2 /nobreak > NUL
+rmdir /s /q "{install_dir}"
+del "%~f0"
+"""
+        with open(temp_bat, "w") as f:
+            f.write(bat_content)
+            
+        subprocess.Popen([temp_bat], creationflags=subprocess.CREATE_NO_WINDOW)
+        
+        QMessageBox.information(None, "Uninstalled", "Advanced Auto Clicker has been successfully removed from your computer.")
+        sys.exit(0)
+    else:
+        sys.exit(0)
+
 if __name__ == "__main__":
+    if "--uninstall" in sys.argv:
+        handle_uninstallation()
+
     handle_exe_deduplication()
     
-    # Check if we should show the installer wizard
     if getattr(sys, 'frozen', False) and "--cleanup" not in sys.argv:
         from installer import get_previous_install_dir
         local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
@@ -504,7 +557,6 @@ if __name__ == "__main__":
         
         current_exe = os.path.abspath(sys.executable)
         
-        # If we are NOT running the installed version, open the installer wizard
         if current_exe.lower() != installed_exe.lower():
             app = QApplication(sys.argv)
             setup_dark_theme(app)
@@ -513,8 +565,6 @@ if __name__ == "__main__":
             wizard = InstallerWindow()
             wizard.exec()
             
-            # If the user completed the installation, the installer spawned the new process.
-            # We exit the current process.
             if wizard.result_status:
                 sys.exit(0)
                 

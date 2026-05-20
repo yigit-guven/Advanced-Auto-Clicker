@@ -63,7 +63,7 @@ def handle_exe_deduplication():
             print(f"Self-replacement failed: {e}")
 
 class UpdateChecker(QThread):
-    update_available = pyqtSignal(str, str)
+    update_available = pyqtSignal(str, str, str)
 
     def __init__(self, current_version):
         super().__init__()
@@ -81,9 +81,15 @@ class UpdateChecker(QThread):
                 data = json.loads(response.read().decode())
                 latest_tag = data.get("tag_name", "")
                 html_url = data.get("html_url", "https://github.com/yigit-guven/Advanced-Auto-Clicker/releases")
+                download_url = ""
+                for asset in data.get("assets", []):
+                    if asset.get("name", "").endswith(".exe"):
+                        download_url = asset.get("browser_download_url", "")
+                        break
+                        
                 if latest_tag:
                     if self.is_newer(latest_tag, self.current_version):
-                        self.update_available.emit(latest_tag, html_url)
+                        self.update_available.emit(latest_tag, html_url, download_url)
         except Exception as e:
             # Silent fallback
             print(f"Update check failed: {e}")
@@ -96,6 +102,33 @@ class UpdateChecker(QThread):
             except ValueError:
                 return [0, 0, 0]
         return parse(latest) > parse(current)
+
+class DownloadWorker(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(bool, str)
+    
+    def __init__(self, url):
+        super().__init__()
+        self.url = url
+        
+    def run(self):
+        try:
+            import urllib.request
+            import tempfile
+            import os
+            
+            temp_dir = tempfile.gettempdir()
+            dest_path = os.path.join(temp_dir, "AdvancedAutoClicker_Update.exe")
+            
+            def hook(count, block_size, total_size):
+                if total_size > 0:
+                    percent = int(count * block_size * 100 / total_size)
+                    self.progress.emit(min(100, percent))
+                    
+            urllib.request.urlretrieve(self.url, dest_path, hook)
+            self.finished.emit(True, dest_path)
+        except Exception as e:
+            self.finished.emit(False, str(e))
 
 class EngineBridge(QObject):
     active_change = pyqtSignal(int)
@@ -300,6 +333,7 @@ class AppController:
         self.dashboard.delete_profile_requested.connect(self.on_delete_profile)
         self.dashboard.rename_profile_requested.connect(self.on_rename_profile)
         self.dashboard.add_empty_profile_requested.connect(self.on_add_empty_profile)
+        self.dashboard.update_requested.connect(self.on_update_requested)
         
         # Connect Overlay Signals
         self.overlay.point_moved.connect(self.move_point)
@@ -621,6 +655,23 @@ class AppController:
             self.dashboard.set_profiles(list(self.profiles.keys()), self.current_profile)
             self.refresh_ui()
 
+    def on_update_requested(self, url):
+        self.download_worker = DownloadWorker(url)
+        self.download_worker.progress.connect(self.dashboard.set_update_progress)
+        self.download_worker.finished.connect(self.on_download_finished)
+        self.download_worker.start()
+        
+    def on_download_finished(self, success, details):
+        if success:
+            subprocess.Popen([details, "--silent-install"])
+            sys.exit(0)
+        else:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.critical(self.dashboard, "Update Error", f"Failed to download update: {details}")
+            self.dashboard.update_progress.hide()
+            self.dashboard.update_btn_changelog.show()
+            self.dashboard.update_btn_install.show()
+
     def start_engine(self):
         if not self.points: return
         self.overlay.set_running(True)
@@ -709,15 +760,29 @@ if __name__ == "__main__":
         current_exe = os.path.abspath(sys.executable)
         
         if current_exe.lower() != installed_exe.lower():
-            app = QApplication(sys.argv)
-            setup_dark_theme(app)
-            
-            from installer import InstallerWindow
-            wizard = InstallerWindow()
-            wizard.exec()
-            
-            if wizard.result_status:
-                sys.exit(0)
+            if "--silent-install" in sys.argv:
+                app = QApplication(sys.argv)
+                from installer import InstallationWorker
+                
+                def on_silent_complete(success, details):
+                    if success:
+                        subprocess.Popen([details, "--cleanup", current_exe], close_fds=True)
+                    sys.exit(0)
+                    
+                worker = InstallationWorker(installed_dir, True, True, True)
+                worker.completed.connect(on_silent_complete)
+                worker.start()
+                sys.exit(app.exec())
+            else:
+                app = QApplication(sys.argv)
+                setup_dark_theme(app)
+                
+                from installer import InstallerWindow
+                wizard = InstallerWindow()
+                wizard.exec()
+                
+                if wizard.result_status:
+                    sys.exit(0)
                 
     controller = AppController()
     controller.run()

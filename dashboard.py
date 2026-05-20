@@ -186,6 +186,7 @@ class DashboardWindow(QMainWindow):
     delete_profile_requested = pyqtSignal(str)
     rename_profile_requested = pyqtSignal(str, str)
     add_empty_profile_requested = pyqtSignal(str)
+    update_requested = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -263,13 +264,24 @@ class DashboardWindow(QMainWindow):
         self.update_label = QLabel("🚀 Update Available!")
         self.update_label.setStyleSheet("color: #0f172a; font-weight: bold; font-size: 13px; background: transparent;")
         
-        self.update_btn = QPushButton("Download Now")
-        self.update_btn.setObjectName("UpdateBtn")
-        self.update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.update_btn_changelog = QPushButton("View Changelog")
+        self.update_btn_changelog.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        self.update_btn_install = QPushButton("1-Click Update")
+        self.update_btn_install.setObjectName("Primary")
+        self.update_btn_install.setCursor(Qt.CursorShape.PointingHandCursor)
+        
+        from PyQt6.QtWidgets import QProgressBar
+        self.update_progress = QProgressBar()
+        self.update_progress.setTextVisible(True)
+        self.update_progress.setRange(0, 100)
+        self.update_progress.hide()
         
         update_banner_layout.addWidget(self.update_label)
         update_banner_layout.addStretch()
-        update_banner_layout.addWidget(self.update_btn)
+        update_banner_layout.addWidget(self.update_btn_changelog)
+        update_banner_layout.addWidget(self.update_btn_install)
+        update_banner_layout.addWidget(self.update_progress)
         self.update_banner.hide()
         main_layout.addWidget(self.update_banner)
         
@@ -428,18 +440,34 @@ class DashboardWindow(QMainWindow):
         else:
             self.status_btn.setStyleSheet(f"background-color: {theme_data['primary']}; color: {theme_data['btn_primary_text']}; border: none; border-radius: 8px; font-weight: 600;")
 
-    def show_update_notification(self, latest_version, download_url):
+    def show_update_notification(self, latest_version, html_url, download_url):
         self.update_label.setText(f"🚀 New Version Available: {latest_version}!")
         self.update_banner.show()
         
         # Disconnect any previous connections to avoid multiple opens
         try:
-            self.update_btn.clicked.disconnect()
+            self.update_btn_changelog.clicked.disconnect()
+            self.update_btn_install.clicked.disconnect()
         except TypeError:
             pass
             
         import webbrowser
-        self.update_btn.clicked.connect(lambda: webbrowser.open(download_url))
+        self.update_btn_changelog.clicked.connect(lambda: webbrowser.open(html_url))
+        
+        if download_url:
+            self.update_btn_install.clicked.connect(lambda: self._on_install_clicked(download_url))
+        else:
+            self.update_btn_install.hide()
+
+    def _on_install_clicked(self, url):
+        self.update_btn_changelog.hide()
+        self.update_btn_install.hide()
+        self.update_progress.show()
+        self.update_progress.setValue(0)
+        self.update_requested.emit(url)
+
+    def set_update_progress(self, val):
+        self.update_progress.setValue(val)
 
     def refresh_list(self, points):
         # Clear layout and delete widgets properly to prevent orphan windows

@@ -1,6 +1,6 @@
 ## [1.0.5] - 2026-05-19
 ### Added
-- 
+- Added "Slow Type Text" mode to automatically write a given string over a designated period of time, calculating character delay to avoid lag.
 
 ### Fixed
 - 

@@ -74,6 +74,19 @@ class ClickEngine:
                         pyautogui.write(text)
                         if press_enter:
                             pyautogui.press('enter')
+                    elif action == 'slow_type_text':
+                        text = point.get('text', '')
+                        duration = point.get('duration', 1.0)
+                        press_enter = point.get('press_enter', False)
+                        if text:
+                            char_delay = duration / len(text)
+                            for char in text:
+                                if not self.is_running:
+                                    break
+                                pyautogui.write(char)
+                                time.sleep(char_delay)
+                        if press_enter and self.is_running:
+                            pyautogui.press('enter')
                     elif action == 'drag':
                         target_x = point.get('target_x', x)
                         target_y = point.get('target_y', y)

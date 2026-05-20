@@ -79,10 +79,10 @@ class PointConfigCard(QFrame):
         v_action = QVBoxLayout()
         v_action.addWidget(QLabel("Type"))
         self.action_combo = QComboBox()
-        self.action_combo.addItems(["Left Click", "Right Click", "Double Click", "Hold Left", "Hold Right", "Key Press", "Hold Key", "Type Text"])
+        self.action_combo.addItems(["Left Click", "Right Click", "Double Click", "Hold Left", "Hold Right", "Key Press", "Hold Key", "Type Text", "Slow Type Text"])
         action_map = {
             "left_click": 0, "right_click": 1, "double_click": 2, 
-            "hold_left": 3, "hold_right": 4, "key_press": 5, "hold_key": 6, "type_text": 7
+            "hold_left": 3, "hold_right": 4, "key_press": 5, "hold_key": 6, "type_text": 7, "slow_type_text": 8
         }
         self.action_combo.setCurrentIndex(action_map.get(data.get('action', 'left_click'), 0))
         self.action_combo.currentIndexChanged.connect(self._on_change)
@@ -137,21 +137,23 @@ class PointConfigCard(QFrame):
         action = self.action_combo.currentText()
         is_key = "Key" in action
         is_hold = "Hold" in action
-        is_type = "Type Text" in action
+        is_type = action == "Type Text"
+        is_slow_type = action == "Slow Type Text"
         
         self.key_input.setVisible(is_key)
-        self.dur_spin.setVisible(is_hold)
-        self.text_input.setVisible(is_type)
-        self.enter_check.setVisible(is_type)
+        self.dur_spin.setVisible(is_hold or is_slow_type)
+        self.text_input.setVisible(is_type or is_slow_type)
+        self.enter_check.setVisible(is_type or is_slow_type)
         
-        self.extra_label.setVisible(is_key or is_hold or is_type)
+        self.extra_label.setVisible(is_key or is_hold or is_type or is_slow_type)
         if is_key: self.extra_label.setText("Key")
+        elif is_slow_type: self.extra_label.setText("Text & Duration")
         elif is_hold: self.extra_label.setText("Duration")
         elif is_type: self.extra_label.setText("Text")
 
     def _on_change(self):
         self._update_visibility()
-        action_keys = ["left_click", "right_click", "double_click", "hold_left", "hold_right", "key_press", "hold_key", "type_text"]
+        action_keys = ["left_click", "right_click", "double_click", "hold_left", "hold_right", "key_press", "hold_key", "type_text", "slow_type_text"]
         new_data = {
             **self.data,
             "action": action_keys[self.action_combo.currentIndex()],

@@ -184,6 +184,8 @@ class DashboardWindow(QMainWindow):
     profile_changed = pyqtSignal(str)
     save_profile_requested = pyqtSignal(str)
     delete_profile_requested = pyqtSignal(str)
+    rename_profile_requested = pyqtSignal(str, str)
+    add_empty_profile_requested = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -233,6 +235,8 @@ class DashboardWindow(QMainWindow):
         profile_layout.addWidget(QLabel("Profile:"))
         self.profile_combo = QComboBox()
         self.profile_combo.currentTextChanged.connect(self._on_profile_combo_changed)
+        self.profile_combo.view().setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.profile_combo.view().customContextMenuRequested.connect(self._show_profile_context_menu)
         profile_layout.addWidget(self.profile_combo, 1)
         
         self.save_profile_btn = QPushButton("Save As")
@@ -353,6 +357,45 @@ class DashboardWindow(QMainWindow):
             reply = QMessageBox.question(self, "Delete Profile", f"Are you sure you want to delete profile '{current}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
             if reply == QMessageBox.StandardButton.Yes:
                 self.delete_profile_requested.emit(current)
+
+    def _show_profile_context_menu(self, pos):
+        index = self.profile_combo.view().indexAt(pos)
+        if not index.isValid():
+            return
+            
+        profile_name = index.data()
+        
+        from PyQt6.QtWidgets import QMenu
+        from PyQt6.QtGui import QAction
+        
+        menu = QMenu(self)
+        
+        rename_action = QAction("Rename", self)
+        delete_action = QAction("Delete", self)
+        add_empty_action = QAction("Add Empty", self)
+        
+        if self.profile_combo.count() <= 1:
+            delete_action.setEnabled(False)
+            
+        menu.addAction(rename_action)
+        menu.addAction(delete_action)
+        menu.addSeparator()
+        menu.addAction(add_empty_action)
+            
+        action = menu.exec(self.profile_combo.view().viewport().mapToGlobal(pos))
+        
+        if action == rename_action:
+            new_name, ok = QInputDialog.getText(self, "Rename Profile", f"Rename '{profile_name}' to:", text=profile_name)
+            if ok and new_name.strip() and new_name.strip() != profile_name:
+                self.rename_profile_requested.emit(profile_name, new_name.strip())
+        elif action == delete_action:
+            reply = QMessageBox.question(self, "Delete Profile", f"Are you sure you want to delete profile '{profile_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if reply == QMessageBox.StandardButton.Yes:
+                self.delete_profile_requested.emit(profile_name)
+        elif action == add_empty_action:
+            name, ok = QInputDialog.getText(self, "Add Empty Profile", "Enter new profile name:")
+            if ok and name.strip():
+                self.add_empty_profile_requested.emit(name.strip())
 
     def set_profiles(self, profiles, current):
         self.profile_combo.blockSignals(True)

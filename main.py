@@ -300,6 +300,8 @@ class AppController:
         self.dashboard.profile_changed.connect(self.on_profile_changed)
         self.dashboard.save_profile_requested.connect(self.on_save_profile)
         self.dashboard.delete_profile_requested.connect(self.on_delete_profile)
+        self.dashboard.rename_profile_requested.connect(self.on_rename_profile)
+        self.dashboard.add_empty_profile_requested.connect(self.on_add_empty_profile)
         
         # Connect Overlay Signals
         self.overlay.point_moved.connect(self.move_point)
@@ -602,6 +604,24 @@ class AppController:
             self.points = self.profiles[self.current_profile]
             self.refresh_ui()
             self.save_config()
+
+    def on_rename_profile(self, old_name, new_name):
+        if old_name in self.profiles and new_name not in self.profiles:
+            self.profiles[new_name] = self.profiles.pop(old_name)
+            if self.current_profile == old_name:
+                self.current_profile = new_name
+            self.save_config()
+            self.dashboard.set_profiles(list(self.profiles.keys()), self.current_profile)
+            
+    def on_add_empty_profile(self, new_name):
+        if new_name and new_name not in self.profiles:
+            self.profiles[new_name] = []
+            self.current_profile = new_name
+            self.points = self.profiles[self.current_profile]
+            engine.set_points(self.points)
+            self.save_config()
+            self.dashboard.set_profiles(list(self.profiles.keys()), self.current_profile)
+            self.refresh_ui()
 
     def start_engine(self):
         if not self.points: return

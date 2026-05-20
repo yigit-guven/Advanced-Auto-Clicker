@@ -188,6 +188,8 @@ class DashboardWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.cards = []
+        self.minimize_to_tray = True
+        self.force_close = False
         self.current_theme = "Dark Blue"
         self.setWindowTitle(f"Advanced Auto Clicker v{VERSION}")
         self.setWindowIcon(QIcon(get_resource_path("icon.png")))
@@ -420,3 +422,13 @@ class DashboardWindow(QMainWindow):
     def update_point_coords(self, index, x, y):
         if 0 <= index < len(self.cards):
             self.cards[index].update_coordinates(x, y)
+
+    def set_minimize_to_tray(self, val):
+        self.minimize_to_tray = val
+
+    def closeEvent(self, event):
+        if self.minimize_to_tray and not self.force_close:
+            event.ignore()
+            self.hide()
+        else:
+            event.accept()

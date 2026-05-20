@@ -161,7 +161,7 @@ def setup_dark_theme(app):
     app.setPalette(palette)
 
 class SettingsDialog(QDialog):
-    def __init__(self, parent, current_theme, hotkeys):
+    def __init__(self, parent, current_theme, hotkeys, settings_flags):
         super().__init__(parent)
         self.setWindowTitle("Settings")
         self.setMinimumWidth(380)
@@ -211,7 +211,26 @@ class SettingsDialog(QDialog):
         self.clear_combo = QComboBox()
         self.clear_combo.addItems(f_keys)
         self.clear_combo.setCurrentText(hotkeys.get("clear", "F8"))
+        self.clear_combo.addItems(f_keys)
+        self.clear_combo.setCurrentText(hotkeys.get("clear", "F8"))
         form_layout.addRow("Clear Sequence:", self.clear_combo)
+        
+        # Application Settings Section
+        app_title = QLabel("Application Settings")
+        app_title.setStyleSheet("font-weight: bold; font-size: 14px; margin-top: 15px; color: #94a3b8;")
+        form_layout.addRow(app_title)
+        
+        self.startup_check = QCheckBox("Run on Windows Startup")
+        self.startup_check.setChecked(settings_flags.get("startup", False))
+        form_layout.addRow(self.startup_check)
+        
+        self.tray_check = QCheckBox("Minimize to System Tray on close")
+        self.tray_check.setChecked(settings_flags.get("tray", True))
+        form_layout.addRow(self.tray_check)
+        
+        self.log_check = QCheckBox("Enable Background Logging")
+        self.log_check.setChecked(settings_flags.get("logging", False))
+        form_layout.addRow(self.log_check)
         
         layout.addLayout(form_layout)
         layout.addSpacing(10)
@@ -238,7 +257,18 @@ class AppController:
         self.app = QApplication.instance()
         if self.app is None:
             self.app = QApplication(sys.argv)
+            self.app.setQuitOnLastWindowClosed(False)
             setup_dark_theme(self.app)
+            
+        # Enforce single instance
+        from PyQt6.QtCore import QSharedMemory
+        self.shared_memory = QSharedMemory("AdvancedAutoClicker_Mutex")
+        if not self.shared_memory.create(1):
+            sys.exit(0)
+            
+        self.run_on_startup = False
+        self.minimize_to_tray = True
+        self.enable_logging = False
         
         self.profiles = {"Default": []}
         self.current_profile = "Default"
@@ -282,7 +312,11 @@ class AppController:
         
         self.load_config()
         self.refresh_ui()
-        self.dashboard.show()
+        self.setup_tray()
+        self.setup_logging()
+        self.dashboard.set_minimize_to_tray(self.minimize_to_tray)
+        if "--hidden" not in sys.argv:
+            self.dashboard.show()
 
     def get_config_path(self):
         base_dir = os.path.dirname(os.path.abspath(sys.executable if getattr(sys, 'frozen', False) else __file__))
@@ -298,21 +332,29 @@ class AppController:
             "toggle": self.hotkeys.toggle_key,
             "clear": self.hotkeys.clear_key
         }
-        dialog = SettingsDialog(self.dashboard, self.dashboard.current_theme, current_hotkeys)
+        settings_flags = {
+            "startup": self.run_on_startup,
+            "tray": self.minimize_to_tray,
+            "logging": self.enable_logging
+        }
+        dialog = SettingsDialog(self.dashboard, self.dashboard.current_theme, current_hotkeys, settings_flags)
         if dialog.exec():
             new_theme = dialog.theme_combo.currentText()
             new_capture = dialog.capture_combo.currentText()
             new_toggle = dialog.toggle_combo.currentText()
             new_clear = dialog.clear_combo.currentText()
             
-            # Apply theme
-            self.apply_theme(new_theme)
+            self.run_on_startup = dialog.startup_check.isChecked()
+            self.minimize_to_tray = dialog.tray_check.isChecked()
+            self.enable_logging = dialog.log_check.isChecked()
             
-            # Apply hotkeys
+            self.apply_theme(new_theme)
             self.hotkeys.update_keys(new_capture, new_toggle, new_clear)
             self.dashboard.update_hotkey_labels(new_capture, new_toggle, new_clear)
             
-            # Save config
+            self.apply_startup_setting()
+            self.setup_logging()
+            self.dashboard.set_minimize_to_tray(self.minimize_to_tray)
             self.save_config()
 
     def load_config(self):
@@ -342,6 +384,10 @@ class AppController:
                     capture_key = data.get("capture_key", "F7")
                     toggle_key = data.get("toggle_key", "F6")
                     clear_key = data.get("clear_key", "F8")
+                    
+                    self.run_on_startup = data.get("run_on_startup", False)
+                    self.enable_logging = data.get("enable_logging", False)
+                    self.minimize_to_tray = data.get("minimize_to_tray", True)
                 else:
                     self.profiles = {"Default": data}
                     self.current_profile = "Default"
@@ -376,7 +422,10 @@ class AppController:
                 "toggle_key": self.hotkeys.toggle_key,
                 "clear_key": self.hotkeys.clear_key,
                 "profiles": self.profiles,
-                "current_profile": self.current_profile
+                "current_profile": self.current_profile,
+                "run_on_startup": self.run_on_startup,
+                "enable_logging": self.enable_logging,
+                "minimize_to_tray": self.minimize_to_tray
             }
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f, indent=4)
@@ -384,6 +433,8 @@ class AppController:
             print(f"Failed to save config: {e}")
 
     def capture_point(self):
+        import logging
+        logging.info("Capturing point")
         x, y = pyautogui.position()
         new_point = {
             "x": x,
@@ -399,6 +450,88 @@ class AppController:
         self.points.append(new_point)
         self.refresh_ui()
         self.save_config()
+
+    def setup_tray(self):
+        from PyQt6.QtWidgets import QSystemTrayIcon, QMenu
+        from PyQt6.QtGui import QAction, QIcon
+        
+        # Use existing method to get resource
+        icon_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icon.png")
+        if getattr(sys, 'frozen', False) and hasattr(sys, '_MEIPASS'):
+            icon_path = os.path.join(sys._MEIPASS, "icon.png")
+            
+        self.tray_icon = QSystemTrayIcon(QIcon(icon_path), self.app)
+        self.tray_icon.setToolTip("Advanced Auto Clicker")
+        
+        tray_menu = QMenu()
+        show_action = QAction("Show Dashboard", self.app)
+        show_action.triggered.connect(lambda: (self.dashboard.showNormal(), self.dashboard.activateWindow()))
+        
+        quit_action = QAction("Quit", self.app)
+        quit_action.triggered.connect(self.quit_app)
+        
+        tray_menu.addAction(show_action)
+        tray_menu.addSeparator()
+        tray_menu.addAction(quit_action)
+        
+        self.tray_icon.setContextMenu(tray_menu)
+        self.tray_icon.show()
+        
+        self.tray_icon.activated.connect(self.on_tray_activated)
+
+    def on_tray_activated(self, reason):
+        from PyQt6.QtWidgets import QSystemTrayIcon
+        if reason == QSystemTrayIcon.ActivationReason.DoubleClick:
+            self.dashboard.showNormal()
+            self.dashboard.activateWindow()
+
+    def quit_app(self):
+        import logging
+        logging.info("Quitting application")
+        self.dashboard.force_close = True
+        self.app.quit()
+
+    def apply_startup_setting(self):
+        try:
+            import winreg
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER, key_path, 0, winreg.KEY_SET_VALUE)
+            app_name = "AdvancedAutoClicker"
+            if self.run_on_startup:
+                exe_path = os.path.abspath(sys.executable)
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, f'"{exe_path}" --hidden')
+            else:
+                try:
+                    winreg.DeleteValue(key, app_name)
+                except Exception:
+                    pass
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+
+    def setup_logging(self):
+        import logging
+        from logging.handlers import RotatingFileHandler
+        logger = logging.getLogger()
+        
+        # Clear existing handlers
+        for handler in logger.handlers[:]:
+            logger.removeHandler(handler)
+            
+        if self.enable_logging:
+            logger.setLevel(logging.INFO)
+            local_appdata = os.environ.get("LOCALAPPDATA", os.path.expanduser("~\\AppData\\Local"))
+            log_dir = os.path.join(local_appdata, "Programs", "AdvancedAutoClicker", "Logs")
+            os.makedirs(log_dir, exist_ok=True)
+            log_file = os.path.join(log_dir, "app.log")
+            
+            handler = RotatingFileHandler(log_file, maxBytes=1024*1024, backupCount=1)
+            formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+            handler.setFormatter(formatter)
+            logger.addHandler(handler)
+            logging.info("Logging started")
+        else:
+            logger.addHandler(logging.NullHandler())
 
     def update_point(self, index, data):
         if 0 <= index < len(self.points):

@@ -92,7 +92,8 @@ class ClickEngine:
                         target_y = point.get('target_y', y)
                         pyautogui.dragTo(target_x, target_y, duration=0.5)
                 except Exception as e:
-                    print(f"Error executing action: {e}")
+                    import logging
+                    logging.error(f"Error executing action: {e}")
                 
                 # Wait after action
                 time.sleep(point.get('delay_after', 0.1))

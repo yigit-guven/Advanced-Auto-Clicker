@@ -5,7 +5,7 @@ import shutil
 import time
 import subprocess
 from PyQt6.QtWidgets import (QApplication, QDialog, QVBoxLayout, QHBoxLayout, 
-                             QLabel, QComboBox, QPushButton, QFormLayout)
+                             QLabel, QComboBox, QPushButton, QFormLayout, QCheckBox)
 from PyQt6.QtCore import QTimer, pyqtSignal, QObject, QThread, Qt
 from PyQt6.QtGui import QPalette, QColor
 from pynput import keyboard
@@ -209,8 +209,6 @@ class SettingsDialog(QDialog):
         form_layout.addRow("Add Point:", self.capture_combo)
         
         self.clear_combo = QComboBox()
-        self.clear_combo.addItems(f_keys)
-        self.clear_combo.setCurrentText(hotkeys.get("clear", "F8"))
         self.clear_combo.addItems(f_keys)
         self.clear_combo.setCurrentText(hotkeys.get("clear", "F8"))
         form_layout.addRow("Clear Sequence:", self.clear_combo)

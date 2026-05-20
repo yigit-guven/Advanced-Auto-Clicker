@@ -40,3 +40,4 @@ Thumbs.db
 artifacts/
 logs/
 config.json
+test_settings.py

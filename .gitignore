@@ -39,3 +39,4 @@ Thumbs.db
 .gemini/
 artifacts/
 logs/
+config.json
